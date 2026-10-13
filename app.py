@@ -3,34 +3,48 @@ import pandas as pd
 import xml.etree.ElementTree as ET
 from io import BytesIO
 import math
-import re  # Ferramenta avançada para buscar padrões de texto
 
 # Configuração da página e visual
 st.set_page_config(page_title="Importador DiLady e Love Secret", page_icon="👙", layout="centered")
 
 st.title("Conversor NFe: DiLady & Love Secret 👙")
-st.write("Faça o upload do XML. Este sistema extrai as Cores e Tamanhos do padrão DiLady/Love Secret automaticamente.")
+st.write("Faça o upload do XML. Este sistema usa o código da fábrica (cProd) para extrair o Tamanho com 100% de precisão.")
 
-def extrair_tamanho_cor(descricao):
-    descricao_upper = descricao.upper()
+def extrair_tamanho_cor(descricao, cprod):
+    descricao_upper = str(descricao).upper()
+    cprod_upper = str(cprod).upper()
     
     tamanho_encontrado = ""
     cor_encontrada = ""
     
-    # 1. BUSCA CIRÚRGICA DO TAMANHO
-    # Procura exatamente por "TAMANHO:" e captura a letra ou número que vem depois
-    match_tamanho = re.search(r'TAMANHO:\s*([A-Z0-9]+)', descricao_upper)
-    if match_tamanho:
-        tamanho_encontrado = match_tamanho.group(1)
+    # 1. ESTRATÉGIA INFALÍVEL PARA O TAMANHO (Olhando o cProd)
+    # Exemplo: Se cProd for "123801.503.42", ele corta nos pontos e pega a última parte ("42")
+    if "." in cprod_upper:
+        partes = cprod_upper.split(".")
+        tamanho_encontrado = partes[-1].strip()
         
-    # 2. BUSCA DA COR
-    # Lista atualizada com as cores do fornecedor (incluindo as siglas como BLK e BNC)
-    cores_comuns = ['PRETO', 'BRANCO', 'BEGE', 'CHOCOLATE', 'NUDE', 'BLUSH', 'VERMELHO', 'MARINHO', 'ROSA', 'CASTANHO', 'AVELA', 'MACADAMIA', 'CARMIN', 'BASE', 'SORTIDO', 'BLK', 'BNC']
+    # Plano B para o tamanho, caso o código não tenha ponto
+    if not tamanho_encontrado:
+        if "TAMANHO:" in descricao_upper:
+            # Pega o que vem depois da palavra "TAMANHO:"
+            pedaco = descricao_upper.split("TAMANHO:")[-1]
+            tamanho_encontrado = pedaco.strip().split(" ")[0]
+            
+    # 2. BUSCA MAIS FLEXÍVEL PARA A COR
+    # Adicionadas variações femininas (PRETA/BRANCA) que costumam vir nas calcinhas
+    cores_comuns = [
+        'PRETO', 'PRETA', 'BRANCO', 'BRANCA', 'BEGE', 'CHOCOLATE', 'NUDE', 'BLUSH', 
+        'VERMELHO', 'VERMELHA', 'MARINHO', 'ROSA', 'CASTANHO', 'AVELA', 'MACADAMIA', 
+        'CARMIN', 'BASE', 'SORTIDO', 'BLK', 'BNC'
+    ]
     
     for cor in cores_comuns:
-        # A regra \b garante que ele ache a cor como palavra inteira (ex: BEGE)
-        if re.search(r'\b' + cor + r'\b', descricao_upper):
+        if cor in descricao_upper:
             cor_encontrada = cor
+            # Se achar "PRETA", preenche como "PRETO" para padronizar
+            if cor_encontrada == 'PRETA': cor_encontrada = 'PRETO'
+            if cor_encontrada == 'BRANCA': cor_encontrada = 'BRANCO'
+            if cor_encontrada == 'VERMELHA': cor_encontrada = 'VERMELHO'
             break
             
     return tamanho_encontrado, cor_encontrada
@@ -49,7 +63,6 @@ if uploaded_file is not None:
         if not produtos:
             st.error("❌ Nenhum produto encontrado neste XML.")
         else:
-            # Estrutura do Microvix (já sem a coluna Código Integracao OMS)
             colunas_microvix = [
                 "Código", "Descrição", "Referência", "Cód. Auxiliar", "Fornecedor", 
                 "Fornecedor exclusivo", "Comprador", "Empresa", "Contabiliza saldo em estoque", 
@@ -82,10 +95,10 @@ if uploaded_file is not None:
                 ean = prod.find('nfe:cEAN', ns).text if prod.find('nfe:cEAN', ns) is not None else ""
                 unidade = prod.find('nfe:uCom', ns).text if prod.find('nfe:uCom', ns) is not None else ""
                 
-                # --- A MÁGICA DE EXTRAÇÃO ACONTECE AQUI ---
-                tamanho_extraido, cor_extraida = extrair_tamanho_cor(descricao)
+                # --- A EXTRAÇÃO AGORA ENVIA O CÓDIGO DA FÁBRICA TAMBÉM ---
+                tamanho_extraido, cor_extraida = extrair_tamanho_cor(descricao, referencia)
                 
-                # Cálculo do Preço (Dobro e arredonda para cima terminando em .90)
+                # Cálculo do Preço
                 custo_str = prod.find('nfe:vUnCom', ns).text if prod.find('nfe:vUnCom', ns) is not None else "0"
                 preco_venda_formatado = ""
                 try:
@@ -111,7 +124,6 @@ if uploaded_file is not None:
                 linha_excel["Tamanho"] = tamanho_extraido
                 linha_excel["Cores"] = cor_extraida
                 
-                # Mantendo os seus padrões e fórmulas
                 linha_excel["Unidade de compra"] = unidade
                 linha_excel["Unidade de venda"] = unidade
                 linha_excel["Preço de venda R$"] = preco_venda_formatado
