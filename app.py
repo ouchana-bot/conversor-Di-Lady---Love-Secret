@@ -3,32 +3,34 @@ import pandas as pd
 import xml.etree.ElementTree as ET
 from io import BytesIO
 import math
+import re  # Ferramenta avançada para buscar padrões de texto
 
 # Configuração da página e visual
 st.set_page_config(page_title="Importador DiLady e Love Secret", page_icon="👙", layout="centered")
 
 st.title("Conversor NFe: DiLady & Love Secret 👙")
-st.write("Faça o upload do XML. Este sistema possui inteligência para extrair Cores e Tamanhos automaticamente.")
+st.write("Faça o upload do XML. Este sistema extrai as Cores e Tamanhos do padrão DiLady/Love Secret automaticamente.")
 
 def extrair_tamanho_cor(descricao):
     descricao_upper = descricao.upper()
     
-    # Busca por tamanhos comuns isolados na descrição
-    tamanhos_comuns = [' P ', ' M ', ' G ', ' GG ', ' EG ', ' XG ', ' 36 ', ' 38 ', ' 40 ', ' 42 ', ' 44 ', ' 46 ', ' 48 ', ' 50 ', ' 52 ', ' 54 ']
     tamanho_encontrado = ""
-    # Colocamos espaços nas pontas do texto para garantir que ele ache o tamanho como uma palavra isolada
-    texto_para_busca = f" {descricao_upper} " 
-    for t in tamanhos_comuns:
-        if t in texto_para_busca:
-            tamanho_encontrado = t.strip() # Remove os espaços após encontrar
-            break
-            
-    # Busca por cores comuns em moda íntima
-    cores_comuns = ['PRETO', 'BRANCO', 'BEGE', 'CHOCOLATE', 'NUDE', 'BLUSH', 'VERMELHO', 'MARINHO', 'ROSA', 'CASTANHO', 'AVELA', 'MACADAMIA', 'CARMIN', 'BASE', 'SORTIDO']
     cor_encontrada = ""
-    for c in cores_comuns:
-        if c in descricao_upper:
-            cor_encontrada = c
+    
+    # 1. BUSCA CIRÚRGICA DO TAMANHO
+    # Procura exatamente por "TAMANHO:" e captura a letra ou número que vem depois
+    match_tamanho = re.search(r'TAMANHO:\s*([A-Z0-9]+)', descricao_upper)
+    if match_tamanho:
+        tamanho_encontrado = match_tamanho.group(1)
+        
+    # 2. BUSCA DA COR
+    # Lista atualizada com as cores do fornecedor (incluindo as siglas como BLK e BNC)
+    cores_comuns = ['PRETO', 'BRANCO', 'BEGE', 'CHOCOLATE', 'NUDE', 'BLUSH', 'VERMELHO', 'MARINHO', 'ROSA', 'CASTANHO', 'AVELA', 'MACADAMIA', 'CARMIN', 'BASE', 'SORTIDO', 'BLK', 'BNC']
+    
+    for cor in cores_comuns:
+        # A regra \b garante que ele ache a cor como palavra inteira (ex: BEGE)
+        if re.search(r'\b' + cor + r'\b', descricao_upper):
+            cor_encontrada = cor
             break
             
     return tamanho_encontrado, cor_encontrada
@@ -47,6 +49,7 @@ if uploaded_file is not None:
         if not produtos:
             st.error("❌ Nenhum produto encontrado neste XML.")
         else:
+            # Estrutura do Microvix (já sem a coluna Código Integracao OMS)
             colunas_microvix = [
                 "Código", "Descrição", "Referência", "Cód. Auxiliar", "Fornecedor", 
                 "Fornecedor exclusivo", "Comprador", "Empresa", "Contabiliza saldo em estoque", 
@@ -79,7 +82,7 @@ if uploaded_file is not None:
                 ean = prod.find('nfe:cEAN', ns).text if prod.find('nfe:cEAN', ns) is not None else ""
                 unidade = prod.find('nfe:uCom', ns).text if prod.find('nfe:uCom', ns) is not None else ""
                 
-                # Inteligência extraindo Tamanho e Cor da descrição
+                # --- A MÁGICA DE EXTRAÇÃO ACONTECE AQUI ---
                 tamanho_extraido, cor_extraida = extrair_tamanho_cor(descricao)
                 
                 # Cálculo do Preço (Dobro e arredonda para cima terminando em .90)
@@ -104,11 +107,11 @@ if uploaded_file is not None:
                 linha_excel["NCM"] = ncm
                 linha_excel["Código de barras"] = ean
                 
-                # --- AS NOVAS REGRAS DE TAMANHO E COR ---
+                # Preenchendo as colunas Cor e Tamanho
                 linha_excel["Tamanho"] = tamanho_extraido
                 linha_excel["Cores"] = cor_extraida
                 
-                # Campos fixos mantidos
+                # Mantendo os seus padrões e fórmulas
                 linha_excel["Unidade de compra"] = unidade
                 linha_excel["Unidade de venda"] = unidade
                 linha_excel["Preço de venda R$"] = preco_venda_formatado
