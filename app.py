@@ -7,14 +7,14 @@ import math
 # Mapeamento do De-Para: Tamanho (XML) -> ID (Microvix)
 MAPEAMENTO_TAMANHOS = {
     'PP': '2', 'P': '3', 'M': '1', 'G': '4', 'GG': '5', 'XG': '97', 'XGG': '117', 
-    'EP': '123', 'EM': '122', 'EG': '102', 'EGG': '124', 'EXG': '41', 'SG': '140', 
-    'U': '96', 'G1': '159', 'G2': '160', 'G3': '161', 'G4': '162', 'G5': '163', 
-    '01': '98', '02': '158', '03': '99', '04': '150', '06': '151', '08': '152', 
-    '10': '153', '12': '154', '14': '155', '16': '156', '18': '157', '34': '20', 
-    '36': '22', '38': '24', '40': '26', '42': '28', '44': '30', '46': '69', 
-    '48': '165', '50': '71', '52': '72', '54': '73', '56': '74', '58': '75', 
-    '60': '76', '90': '133', '95': '134', '100': '135', '105': '136', '110': '137', 
-    '115': '138', '120': '139', '6M': '170', '9M': '171', '12M': '172', '18M': '173'
+    'XXG': '174', 'EP': '123', 'EM': '122', 'EG': '102', 'EGG': '124', 'EXG': '41', 
+    'SG': '140', 'U': '96', 'G1': '159', 'G2': '160', 'G3': '161', 'G4': '162', 
+    'G5': '163', '01': '98', '02': '158', '03': '99', '04': '150', '06': '151', 
+    '08': '152', '10': '153', '12': '154', '14': '155', '16': '156', '18': '157', 
+    '34': '20', '36': '22', '38': '24', '40': '26', '42': '28', '44': '30', 
+    '46': '69', '48': '165', '50': '71', '52': '72', '54': '73', '56': '74', 
+    '58': '75', '60': '76', '90': '133', '95': '134', '100': '135', '105': '136', 
+    '110': '137', '115': '138', '120': '139', '6M': '170', '9M': '171', '12M': '172', '18M': '173'
 }
 
 def converter_tamanho_para_id(tamanho):
@@ -35,7 +35,7 @@ def converter_tamanho_para_id(tamanho):
 st.set_page_config(page_title="Importador DiLady e Love Secret", page_icon="👙", layout="centered")
 
 st.title("Conversor NFe: DiLady & Love Secret 👙")
-st.write("Faça o upload do XML. Este sistema extrai Tamanho e Cor e mapeia o Tamanho para o ID do Microvix.")
+st.write("Faça o upload do XML. Este sistema extrai o Tamanho e mapeia para o ID do Microvix.")
 
 uploaded_file = st.file_uploader("Arraste e solte o arquivo XML aqui", type=["xml"])
 
@@ -83,22 +83,16 @@ if uploaded_file is not None:
                 unidade = prod.find('nfe:uCom', ns).text if prod.find('nfe:uCom', ns) is not None else ""
                 
                 tamanho_extraido = ""
-                cor_extraida = ""
                 infAdProd = det.find('nfe:infAdProd', ns)
                 
                 if infAdProd is not None and infAdProd.text:
                     texto_adicional = infAdProd.text.upper()
                     if " TAM. " in texto_adicional:
                         partes = texto_adicional.split(" TAM. ")
-                        cor_extraida = partes[0].strip()
                         tamanho_extraido = partes[1].strip()
                     elif " TAM: " in texto_adicional:
                         partes = texto_adicional.split(" TAM: ")
-                        cor_extraida = partes[0].strip()
                         tamanho_extraido = partes[1].strip()
-                
-                if cor_extraida == 'PRETA': cor_extraida = 'PRETO'
-                if cor_extraida == 'BRANCA': cor_extraida = 'BRANCO'
                 
                 tamanho_id = converter_tamanho_para_id(tamanho_extraido)
                 
@@ -123,7 +117,7 @@ if uploaded_file is not None:
                 linha_excel["NCM"] = ncm
                 linha_excel["Código de barras"] = ean
                 linha_excel["Tamanho"] = tamanho_id
-                linha_excel["Cores"] = cor_extraida
+                linha_excel["Cores"] = ""  # Mantido em branco conforme solicitado
                 linha_excel["Unidade de compra"] = unidade
                 linha_excel["Unidade de venda"] = unidade
                 linha_excel["Preço de venda R$"] = preco_venda_formatado
